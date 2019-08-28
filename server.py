@@ -25,6 +25,8 @@ import numpy as np
 import enum
 import flask_excel as excel
 
+import logging
+
 
 ENV_FILE = find_dotenv()
 if ENV_FILE:
@@ -69,23 +71,27 @@ class Patient(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     status = db.Column(db.String, nullable=False)
-    features = db.relationship('Feature', backref='patient',lazy=True)
+    features = db.relationship('Feature', backref='patient',lazy=False)
     def __repr__(self):
-        return self.status
+        return self.id
 
 class Feature(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     featureName = db.Column(db.String(20),nullable=False)
-    featureValue=db.Column(db.String(20),nullable=True)
+    featureValue = db.Column(db.String(20),nullable=True)
     patient_id = db.Column(db.Integer, db.ForeignKey('patient.id'))
     classifier_id = db.Column(db.Integer, db.ForeignKey('classifier.id'))
+    def __repr__(self):
+        return self.featureValue
 
 class Classifier(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     classifierStatus = db.Column(db.String, nullable=True)
     featrues = db.relationship('Feature', backref='classifier',lazy=True)
-    
+    def __repr__(self):
+        return self.id
+
 
 # Example table 
 class Summation(db.Model):
@@ -223,8 +229,6 @@ def public():
     return jsonify(message=response)
 
 
-
-
 @APP.route("/api/private")
 @cross_origin(headers=["Content-Type", "Authorization"])
 @cross_origin(headers=["Access-Control-Allow-Origin", "http://localhost:3000"])
@@ -285,6 +289,7 @@ def graphql_server():
 
 # TODO: Use the domain environment variable
 # TODO: Make sure the file name is unique
+# TODO: Since this is an API don't flash but send response
 
 @APP.route('/api/upload', methods=['POST'])
 @cross_origin(headers=["Content-Type", "Authorization"])
@@ -298,27 +303,70 @@ def upload_file():
     file = request.files['file']
     if file.filename == '':
         flash('No file selected!')
+
     if file and allowed_file(file.filename):
         filename = secure_filename(file.filename)
         message = filename
+        file_path = os.path.join(APP.config['UPLOAD_FOLDER'], filename)
+        user_id = _request_ctx_stack.top.current_user.get('sub')
+        
+        # this is not necessary as the file ereased 
+        if os.path.exists(file_path):
+            importDatabase(filename, user_id)
+            return jsonify(message="file already exists"), 200   
         file.save(os.path.join(APP.config['UPLOAD_FOLDER'], filename))
         
+        #TODO: Check if the user exists
         user_id = _request_ctx_stack.top.current_user.get('sub')
         #Get the mail from the access token which is modified by the help of the help of the auth0 rules
         mail = _request_ctx_stack.top.current_user.get('https://dev-yy8du86w.eu/mail')
         
-
         this_user = User(id=user_id, mail=mail)
-        df = pd.read_excel(os.path.join(APP.config['UPLOAD_FOLDER'],filename))
-        
+
+        #Do not create a user object if it already exists
+        if not (User.query.get(user_id)):
+            db.session.add(this_user)
+            db.session.commit()
+        print("Existing user")
+        importDatabase(filename, user_id)
     
-        db.session.add(this_user)
-        db.session.commit()
-        print(df['A'])
         status_code = 200 
     
     return jsonify(message=message), status_code
 
+# Create a SQLDatabase from the uploaded excel file
+# This is just for a specific database
+# TODO: Surround with try catch
+def importDatabase(filename, user):
+        df = pd.read_excel(os.path.join(APP.config['UPLOAD_FOLDER'],filename))
+        for index, row in df.iterrows():
+            new_patient = Patient(user_id=user, status="undiag")
+            featureA = Feature(featureName='A', featureValue=str(row[0]))
+            featureB = Feature(featureName='B', featureValue=str(row[1]))
+            featureC = Feature(featureName='C', featureValue=str(row[2]))
+            new_patient.features.append(featureA)
+            new_patient.features.append(featureB)
+            new_patient.features.append(featureC)
+            db.session.add(new_patient)
+            db.session.commit()
+        os.remove(os.path.join(APP.config['UPLOAD_FOLDER'],filename))
+
+# Initialize a classifier from the all available features 
+def initializeClassifier():
+    user_id = _request_ctx_stack.top.current_user.get('sub')
+    if not (User.query.get(user_id)):
+        print("No database uploaded")
+    
+    patient = Patient.query.get(1)
+
+    r = db.session.query(Patient,Feature).outerjoin(Feature, Patient.id == Feature.patient_id).all()
+
+    a = np.arange(15).reshape(5,3)
+    for element in a.flat:
+        a.flat[element] = np.int64(r[element].Feature.featureValue)
+    
+    print(patient)
+    
 
 if __name__ == "__main__":
     type_defs = """
@@ -327,17 +375,8 @@ if __name__ == "__main__":
         }
         type Mutation {
             sum(a: Int!, b: Int!): Int!
-            uploadImage(file: Upload!): Boolean!
+            startTraining: String!
         }     
-        type File {
-            id: ID!
-            path: String!
-            filename: String!
-            mimetype: String!
-            encoding: String!
-            }
-        scalar Upload
-        
     """
 
     query = QueryType()
@@ -346,8 +385,8 @@ if __name__ == "__main__":
     @query.field("hello")
     def resolve_hello(_, info):
         request = info.context
-        user_agent = request.headers.get("User-Agent","Guest")
-        muser= _request_ctx_stack.top.current_user.get('sub')
+        #user_agent = request.headers.get("User-Agent","Guest")
+        muser = _request_ctx_stack.top.current_user.get('sub')
         #return "Hello, %s" % request.headers
         return  Summation.query.filter_by(user=muser).first()
 
@@ -368,6 +407,12 @@ if __name__ == "__main__":
 
         return c
 
-    schema = make_executable_schema(type_defs, [query, mutation, upload_scalar])
+    @mutation.field("startTraining")
+    def resolve_train(_, info):
+        print("In train resolve")
+        initializeClassifier()
+        return "gjwp"
+
+    schema = make_executable_schema(type_defs, [query, mutation])
 
     APP.run(port=env.get("PORT", 3010), debug=True)
