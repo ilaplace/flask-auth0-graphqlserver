@@ -5,28 +5,21 @@ from functools import wraps
 import json
 from os import environ as env
 from six.moves.urllib.request import urlopen
-
 from dotenv import load_dotenv, find_dotenv
 from quart import Quart, request, jsonify, _request_ctx_stack, flash 
-#from flask_cors import cross_origin
 from quart_cors import cors, route_cors
 import quart.flask_patch
 from jose import jwt
-
 from ariadne import QueryType, graphql, make_executable_schema, MutationType, upload_scalar
 from ariadne.constants import PLAYGROUND_HTML
-
 from flask_sqlalchemy import SQLAlchemy
-
 import os
 from werkzeug.utils import secure_filename
-
 import pandas as pd
 import numpy as np
-
 import enum
-
-import logging
+import asyncio
+import concurrent.futures
 
 
 ENV_FILE = find_dotenv()
@@ -46,11 +39,7 @@ db = SQLAlchemy(APP)
 APP.secret_key = 'super secret key'
 APP.config['SESSION_TYPE'] = 'filesystem'
 
- 
-#deneme (turns out it's necesseay)
-APP = cors(
-    APP
-)
+
 class PatientStatus(enum.Enum):
     DIAGNOSED = 1
     FAILED = 2
@@ -356,6 +345,7 @@ def train():
     return sum(i * i for i in range(10 ** 8))
 
 # Initialize a classifier from the all available features 
+# TODO: User must be blocked from asking to training multiple times
 async def initializeClassifier():
     user_id = _request_ctx_stack.top.current_user.get('sub')
     if not (User.query.get(user_id)):
@@ -369,6 +359,12 @@ async def initializeClassifier():
     for element in a.flat:
         a.flat[element] = np.int64(r[element].Feature.featureValue)
     print(a)
+
+    loop = asyncio.get_running_loop()
+    with concurrent.futures.ProcessPoolExecutor() as pool:
+        result = loop.run_in_executor(pool, train)
+        print(await result)
+        return result
 
 if __name__ == "__main__":
     type_defs = """
