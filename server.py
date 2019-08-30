@@ -7,11 +7,13 @@ from os import environ as env
 from six.moves.urllib.request import urlopen
 
 from dotenv import load_dotenv, find_dotenv
-from flask import Flask, request, jsonify, _request_ctx_stack, flash 
-from flask_cors import cross_origin, CORS
+from quart import Quart, request, jsonify, _request_ctx_stack, flash 
+#from flask_cors import cross_origin
+from quart_cors import cors, route_cors
+import quart.flask_patch
 from jose import jwt
 
-from ariadne import QueryType, graphql_sync, make_executable_schema, MutationType, upload_scalar
+from ariadne import QueryType, graphql, make_executable_schema, MutationType, upload_scalar
 from ariadne.constants import PLAYGROUND_HTML
 
 from flask_sqlalchemy import SQLAlchemy
@@ -23,7 +25,6 @@ import pandas as pd
 import numpy as np
 
 import enum
-import flask_excel as excel
 
 import logging
 
@@ -37,18 +38,19 @@ ALGORITHMS = ["RS256"]
 
 UPLOAD_FOLDER = os.getcwd() + '/uploads'
 ALLOWED_EXTENSIONS = {'xlsx'}
-APP = Flask(__name__)
+APP = Quart(__name__)
 APP.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///test.db'
 APP.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 db = SQLAlchemy(APP)
-excel.init_excel(APP)
 
 APP.secret_key = 'super secret key'
 APP.config['SESSION_TYPE'] = 'filesystem'
 
-
+ 
 #deneme (turns out it's necesseay)
-CORS(APP, support_creadentials=True)
+APP = cors(
+    APP
+)
 class PatientStatus(enum.Enum):
     DIAGNOSED = 1
     FAILED = 2
@@ -221,7 +223,6 @@ def requires_auth(f):
 
 # Controllers API
 @APP.route("/api/public")
-@cross_origin(headers=["Content-Type", "Authorization"])
 def public():
     """No access token required to access this route
     """
@@ -230,8 +231,6 @@ def public():
 
 
 @APP.route("/api/private")
-@cross_origin(headers=["Content-Type", "Authorization"])
-@cross_origin(headers=["Access-Control-Allow-Origin", "http://localhost:3000"])
 @requires_auth
 def private():
     """A valid access token is required to access this route
@@ -242,8 +241,6 @@ def private():
 
 #unused 
 @APP.route("/api/private-scoped")
-@cross_origin(headers=["Content-Type", "Authorization"])
-@cross_origin(headers=["Access-Control-Allow-Origin", "http://localhost:3000"])
 @requires_auth
 def private_scoped():
     """A valid access token and an appropriate scope are required to access this route
@@ -258,7 +255,6 @@ def private_scoped():
 
 
 @APP.route("/graphql", methods=["GET"])
-@cross_origin(headers=["Content-Type", "Authorization"])
 def graphql_playgroud():
     # On GET request serve GraphQL Playground
     # You don't need to provide Playground if you don't want to
@@ -268,20 +264,22 @@ def graphql_playgroud():
 
 # TODO: update route to /api/graphql
 @APP.route("/graphql", methods=["POST"])
-@cross_origin(headers=["Content-Type", "Authorization"])
-@cross_origin(headers=["Access-Control-Allow-Origin", "http://localhost:3000"])
+@route_cors(
+    allow_origin="http://127.0.0.1:3000", 
+    allow_methods=["POST","GET"],
+    allow_headers=["Authorization","Content-Type"])
 @requires_auth
-def graphql_server():
+async def graphql_server():
     # GraphQL queries are always sent as POST
-    data = request.get_json()
+    data = await request.get_json()
 
     # Note: Passing the request to the context is optional.
     # In Flask, the current request is always accessible as flask.request
-    success, result = graphql_sync(
+     
+    success, result = await graphql(
         schema,
         data,
-        context_value=request,
-        debug=APP.debug
+        context_value = request
     )
 
     status_code = 200 if success else 400
@@ -292,15 +290,17 @@ def graphql_server():
 # TODO: Since this is an API don't flash but send response
 
 @APP.route('/api/upload', methods=['POST'])
-@cross_origin(headers=["Content-Type", "Authorization"])
-@cross_origin(headers=["Access-Control-Allow-Origin", "http://localhost:3000"])
+@route_cors(
+    allow_origin="http://127.0.0.1:3000", 
+    allow_methods=["POST","GET"],
+    allow_headers=["Authorization","Content-Type"])
 @requires_auth
-def upload_file():
+async def upload_file():
     status_code = 400 
     message = "unkown file"
-    if 'file' not in request.files:
+    if 'file' not in await request.files:
         flash('No file part')
-    file = request.files['file']
+    file = (await request.files)['file']
     if file.filename == '':
         flash('No file selected!')
 
@@ -337,7 +337,7 @@ def upload_file():
 # Create a SQLDatabase from the uploaded excel file
 # This is just for a specific database
 # TODO: Surround with try catch
-def importDatabase(filename, user):
+async def importDatabase(filename, user):
         df = pd.read_excel(os.path.join(APP.config['UPLOAD_FOLDER'],filename))
         for index, row in df.iterrows():
             new_patient = Patient(user_id=user, status="undiag")
@@ -351,8 +351,12 @@ def importDatabase(filename, user):
             db.session.commit()
         os.remove(os.path.join(APP.config['UPLOAD_FOLDER'],filename))
 
+def train():
+    print("In training")
+    return sum(i * i for i in range(10 ** 8))
+
 # Initialize a classifier from the all available features 
-def initializeClassifier():
+async def initializeClassifier():
     user_id = _request_ctx_stack.top.current_user.get('sub')
     if not (User.query.get(user_id)):
         print("No database uploaded")
@@ -364,9 +368,7 @@ def initializeClassifier():
     a = np.arange(15).reshape(5,3)
     for element in a.flat:
         a.flat[element] = np.int64(r[element].Feature.featureValue)
-    
-    print(patient)
-    
+    print(a)
 
 if __name__ == "__main__":
     type_defs = """
@@ -408,11 +410,11 @@ if __name__ == "__main__":
         return c
 
     @mutation.field("startTraining")
-    def resolve_train(_, info):
+    async def resolve_train(_, info):
         print("In train resolve")
-        initializeClassifier()
+        await initializeClassifier()
         return "gjwp"
 
     schema = make_executable_schema(type_defs, [query, mutation])
 
-    APP.run(port=env.get("PORT", 3010), debug=True)
+    APP.run(host="127.0.0.1", port=env.get("PORT", 3010), debug=True)

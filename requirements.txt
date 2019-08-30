@@ -1,7 +1,6 @@
-flask
+quart
 python-dotenv
 python-jose
-flask-cors
 flask_sqlalchemy
 six
 ariadne
