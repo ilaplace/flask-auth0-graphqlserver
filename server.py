@@ -372,7 +372,7 @@ async def initializeClassifier():
     loop = asyncio.get_running_loop()
     with concurrent.futures.ProcessPoolExecutor() as pool:
         result = loop.run_in_executor(pool, train)
-        print(await result)
+        #print(await result)
         return result
 
 @route_cors(
@@ -421,9 +421,7 @@ if __name__ == "__main__":
             hello: String!}
         type Mutation {
             sum(a: Int!, b: Int!): Int!
-            startTraining: String!}
-        type Subscription{
-            trainStatus: Int!}     
+            startTraining: String!}  
     """
 
     query = QueryType()
@@ -460,16 +458,6 @@ if __name__ == "__main__":
         print("In train resolve")
         await initializeClassifier()
         return "gjwp"
-
-    @subscription.source("trainStatus")
-    async def status_generator(obj, info):
-        for i in range(5):
-            await asyncio.sleep(1)
-            yield i
-    
-    @subscription.field("trainStatus")
-    def status_resolver(count, info):
-        return count + 1
 
 
     schema = make_executable_schema(type_defs, [query, mutation])
