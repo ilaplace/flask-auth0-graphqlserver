@@ -6,11 +6,11 @@ import json
 from os import environ as env
 from six.moves.urllib.request import urlopen
 from dotenv import load_dotenv, find_dotenv
-from quart import Quart, request, jsonify, _request_ctx_stack, flash 
-from quart_cors import cors, route_cors
+from quart import Quart, request, jsonify, _request_ctx_stack, flash, make_response
+from quart_cors import cors, route_cors, websocket_cors
 import quart.flask_patch
 from jose import jwt
-from ariadne import QueryType, graphql, make_executable_schema, MutationType, upload_scalar
+from ariadne import QueryType, graphql, make_executable_schema, MutationType, upload_scalar, SubscriptionType
 from ariadne.constants import PLAYGROUND_HTML
 from flask_sqlalchemy import SQLAlchemy
 import os
@@ -20,6 +20,7 @@ import numpy as np
 import enum
 import asyncio
 import concurrent.futures
+from serversentevent import ServerSentEvent
 
 
 ENV_FILE = find_dotenv()
@@ -38,8 +39,14 @@ db = SQLAlchemy(APP)
 
 APP.secret_key = 'super secret key'
 APP.config['SESSION_TYPE'] = 'filesystem'
+APP.clients = set()
 
-
+APP = cors(APP,    
+    allow_origin='http://localhost:3000', 
+    allow_methods='*',
+    allow_headers='*',
+    allow_credentials=True
+    )
 class PatientStatus(enum.Enum):
     DIAGNOSED = 1
     FAILED = 2
@@ -252,11 +259,12 @@ def graphql_playgroud():
     return PLAYGROUND_HTML, 200
 
 # TODO: update route to /api/graphql
-@APP.route("/graphql", methods=["POST"])
+
 @route_cors(
     allow_origin="http://127.0.0.1:3000", 
     allow_methods=["POST","GET"],
     allow_headers=["Authorization","Content-Type"])
+@APP.route("/graphql", methods=["POST"])
 @requires_auth
 async def graphql_server():
     # GraphQL queries are always sent as POST
@@ -280,7 +288,7 @@ async def graphql_server():
 
 @APP.route('/api/upload', methods=['POST'])
 @route_cors(
-    allow_origin="http://127.0.0.1:3000", 
+    allow_origin="http://127.0.0.1:3000/", 
     allow_methods=["POST","GET"],
     allow_headers=["Authorization","Content-Type"])
 @requires_auth
@@ -326,6 +334,7 @@ async def upload_file():
 # Create a SQLDatabase from the uploaded excel file
 # This is just for a specific database
 # TODO: Surround with try catch
+# TODO: This needs to go to a seperate thread
 async def importDatabase(filename, user):
         df = pd.read_excel(os.path.join(APP.config['UPLOAD_FOLDER'],filename))
         for index, row in df.iterrows():
@@ -366,19 +375,60 @@ async def initializeClassifier():
         print(await result)
         return result
 
+@route_cors(
+    allow_origin="http://127.0.0.1:3000")
+@APP.route('/', methods=['GET','POST'])
+async def broadcast():
+    data = await request.get_json()
+    for queue in APP.clients:
+        await queue.put(data['message'])
+    return jsonify(True)
+
+@route_cors(
+    allow_headers='*',
+    allow_origin='http://localhost:3000', 
+    allow_methods=["POST","GET"],
+    allow_credentials=True
+    )
+@APP.route('/sse')
+async def sse():
+    queue = asyncio.Queue()
+    APP.clients.add(queue)
+    async def send_events():
+        while True:
+            try:
+                data = await queue.get()
+                event = ServerSentEvent(data)
+                yield event.encode()
+            except asyncio.CancelledError as error:
+                APP.clients.remove(queue)
+                print(error)
+
+    response = await make_response(
+        send_events(),
+        {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Transfer-Encoding': 'chunked',
+        },
+    )
+    response.timeout = None
+    return response
+
 if __name__ == "__main__":
     type_defs = """
         type Query {
-            hello: String!
-        }
+            hello: String!}
         type Mutation {
             sum(a: Int!, b: Int!): Int!
-            startTraining: String!
-        }     
+            startTraining: String!}
+        type Subscription{
+            trainStatus: Int!}     
     """
 
     query = QueryType()
     mutation = MutationType()
+    subscription = SubscriptionType()
 
     @query.field("hello")
     def resolve_hello(_, info):
@@ -390,7 +440,7 @@ if __name__ == "__main__":
 
     @mutation.field("sum")
     def resolve_sum(_, info, a, b):
-        c = a + b
+        c = a + b 
         # to create a new record of summation 
         muser = _request_ctx_stack.top.current_user.get('sub')
         mus = Summation.query.filter_by(user=muser).first()
@@ -410,6 +460,17 @@ if __name__ == "__main__":
         print("In train resolve")
         await initializeClassifier()
         return "gjwp"
+
+    @subscription.source("trainStatus")
+    async def status_generator(obj, info):
+        for i in range(5):
+            await asyncio.sleep(1)
+            yield i
+    
+    @subscription.field("trainStatus")
+    def status_resolver(count, info):
+        return count + 1
+
 
     schema = make_executable_schema(type_defs, [query, mutation])
 
