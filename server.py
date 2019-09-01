@@ -19,9 +19,12 @@ import pandas as pd
 import numpy as np
 import enum
 import asyncio
+
+import multiprocessing
 import concurrent.futures
 from serversentevent import ServerSentEvent
 
+import time
 
 ENV_FILE = find_dotenv()
 if ENV_FILE:
@@ -286,14 +289,14 @@ async def graphql_server():
 # TODO: Make sure the file name is unique
 # TODO: Since this is an API don't flash but send response
 
-@APP.route('/api/upload', methods=['POST'])
+
 @route_cors(
-    allow_origin="http://127.0.0.1:3000/", 
+    allow_origin='http://localhost:3000', 
     allow_methods=["POST","GET"],
-    allow_headers=["Authorization","Content-Type"])
+    allow_headers='*')
+@APP.route('/api/upload', methods=['POST'])
 @requires_auth
 async def upload_file():
-    status_code = 400 
     message = "unkown file"
     if 'file' not in await request.files:
         flash('No file part')
@@ -308,9 +311,10 @@ async def upload_file():
         user_id = _request_ctx_stack.top.current_user.get('sub')
         
         # this is not necessary as the file ereased 
-        if os.path.exists(file_path):
-            importDatabase(filename, user_id)
-            return jsonify(message="file already exists"), 200   
+        # if os.path.exists(file_path):
+        #     await importDatabase(filename, user_id)
+        #     return jsonify(message="file already exists"), 200   
+
         file.save(os.path.join(APP.config['UPLOAD_FOLDER'], filename))
         
         #TODO: Check if the user exists
@@ -319,71 +323,96 @@ async def upload_file():
         mail = _request_ctx_stack.top.current_user.get('https://dev-yy8du86w.eu/mail')
         
         this_user = User(id=user_id, mail=mail)
-
         #Do not create a user object if it already exists
         if not (User.query.get(user_id)):
             db.session.add(this_user)
             db.session.commit()
-        print("Existing user")
+
         importDatabase(filename, user_id)
+
+        classifier = Classifier(user_id=user_id, classifierStatus="untrained")
+        db.session.add(classifier)
+        db.session.commit()
+
     
-        status_code = 200 
-    
-    return jsonify(message=message), status_code
+    return jsonify(message=message), 200
 
 # Create a SQLDatabase from the uploaded excel file
 # This is just for a specific database
 # TODO: Surround with try catch
 # TODO: This needs to go to a seperate thread
-async def importDatabase(filename, user):
-        df = pd.read_excel(os.path.join(APP.config['UPLOAD_FOLDER'],filename))
-        for index, row in df.iterrows():
-            new_patient = Patient(user_id=user, status="undiag")
-            featureA = Feature(featureName='A', featureValue=str(row[0]))
-            featureB = Feature(featureName='B', featureValue=str(row[1]))
-            featureC = Feature(featureName='C', featureValue=str(row[2]))
-            new_patient.features.append(featureA)
-            new_patient.features.append(featureB)
-            new_patient.features.append(featureC)
-            db.session.add(new_patient)
-            db.session.commit()
-        os.remove(os.path.join(APP.config['UPLOAD_FOLDER'],filename))
+def importDatabase(filename, user):
+    df = pd.read_excel(os.path.join(APP.config['UPLOAD_FOLDER'],filename))
+    
+    for index, row in df.iterrows():
+        new_patient = Patient(user_id=user, status="undiag")
+        featureA = Feature(featureName='A', featureValue=str(row[0]))
+        featureB = Feature(featureName='B', featureValue=str(row[1]))
+        featureC = Feature(featureName='C', featureValue=str(row[2]))
+        new_patient.features.append(featureA)
+        new_patient.features.append(featureB)
+        new_patient.features.append(featureC)
+        db.session.add(new_patient)
+        db.session.commit()
+    
+    os.remove(os.path.join(APP.config['UPLOAD_FOLDER'],filename))
 
-def train():
+
+# simulating a CPU bound task
+def train(classifier):
     print("In training")
-    return sum(i * i for i in range(10 ** 8))
+    sum(i * i for i in range(10 ** 7))
+    
+    classifier.classifierStatus = "done"
+    return classifier
+
+
 
 # Initialize a classifier from the all available features 
 # TODO: User must be blocked from asking to training multiple times
-async def initializeClassifier():
+async def initializeClassifier(loop):
     user_id = _request_ctx_stack.top.current_user.get('sub')
     if not (User.query.get(user_id)):
-        print("No database uploaded")
+        print("No database found")
     
-    patient = Patient.query.get(1)
+    # TODO: get the requested dude's data
+    patient = Patient.query.get(user_id)
+
+    # TODO: set the user id
+    # create a new classifier
+    #classifier = Classifier(user_id=1, classifierStatus="training")
+
+    #modify the exisitng classifier
+    classifier = Classifier.query.filter_by(user_id=user_id).first()
+    classifier.classifierStatus = "training"
+    db.session.add(classifier)
+    db.session.commit()
+    print("Classifier status updated")
+
 
     r = db.session.query(Patient,Feature).outerjoin(Feature, Patient.id == Feature.patient_id).all()
-
+    
     a = np.arange(15).reshape(5,3)
     for element in a.flat:
         a.flat[element] = np.int64(r[element].Feature.featureValue)
     print(a)
 
-    loop = asyncio.get_running_loop()
     with concurrent.futures.ProcessPoolExecutor() as pool:
-        result = loop.run_in_executor(pool, train)
-        #print(await result)
-        return result
+        classifier = Classifier.query.filter_by(user_id=user_id).first()
+        trainedClassifier = await loop.run_in_executor(pool, train, classifier)
+        classifier.classifierStatus = trainedClassifier.classifierStatus
+        db.session.add(classifier)
+        db.session.commit()
+        return "success"
 
-@route_cors(
-    allow_origin="http://127.0.0.1:3000")
-@APP.route('/', methods=['GET','POST'])
-async def broadcast():
-    data = await request.get_json()
+
+
+async def broadcast(data):
     for queue in APP.clients:
-        await queue.put(data['message'])
+        await queue.put(data)
     return jsonify(True)
 
+# To send events to frontend
 @route_cors(
     allow_headers='*',
     allow_origin='http://localhost:3000', 
@@ -415,6 +444,8 @@ async def sse():
     response.timeout = None
     return response
 
+
+
 if __name__ == "__main__":
     type_defs = """
         type Query {
@@ -434,7 +465,7 @@ if __name__ == "__main__":
         #user_agent = request.headers.get("User-Agent","Guest")
         muser = _request_ctx_stack.top.current_user.get('sub')
         #return "Hello, %s" % request.headers
-        return  Summation.query.filter_by(user=muser).first()
+        return  "yello"
 
     @mutation.field("sum")
     def resolve_sum(_, info, a, b):
@@ -456,7 +487,8 @@ if __name__ == "__main__":
     @mutation.field("startTraining")
     async def resolve_train(_, info):
         print("In train resolve")
-        await initializeClassifier()
+        loop = asyncio.get_running_loop()
+        result = await initializeClassifier(loop)
         return "gjwp"
 
 
