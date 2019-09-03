@@ -360,7 +360,6 @@ def importDatabase(filename, user):
 
 # simulating a CPU bound task
 def train(classifier):
-    print("In training")
     sum(i * i for i in range(10 ** 7))
     
     classifier.classifierStatus = "done"
@@ -383,11 +382,6 @@ async def initializeClassifier(loop):
     #classifier = Classifier(user_id=1, classifierStatus="training")
 
     #modify the exisitng classifier
-    classifier = Classifier.query.filter_by(user_id=user_id).first()
-    classifier.classifierStatus = "training"
-    db.session.add(classifier)
-    db.session.commit()
-    print("Classifier status updated")
 
 
     r = db.session.query(Patient,Feature).outerjoin(Feature, Patient.id == Feature.patient_id).all()
@@ -449,7 +443,8 @@ async def sse():
 if __name__ == "__main__":
     type_defs = """
         type Query {
-            hello: String!}
+            hello: String!
+            checkStatus: String!}
         type Mutation {
             sum(a: Int!, b: Int!): Int!
             startTraining: String!}  
@@ -466,6 +461,13 @@ if __name__ == "__main__":
         muser = _request_ctx_stack.top.current_user.get('sub')
         #return "Hello, %s" % request.headers
         return  "yello"
+    
+    @query.field("checkStatus")
+    def resolve_chech_status(_,info):
+        user_id = _request_ctx_stack.top.current_user.get('sub')
+        classifier = Classifier.query.filter_by(user_id=user_id).first()
+        print(classifier.classifierStatus)
+        return classifier.classifierStatus
 
     @mutation.field("sum")
     def resolve_sum(_, info, a, b):
@@ -486,10 +488,24 @@ if __name__ == "__main__":
 
     @mutation.field("startTraining")
     async def resolve_train(_, info):
-        print("In train resolve")
-        loop = asyncio.get_running_loop()
-        result = await initializeClassifier(loop)
-        return "gjwp"
+       
+        user_id = _request_ctx_stack.top.current_user.get('sub')
+        classifier = Classifier.query.filter_by(user_id=user_id).first()
+        
+        # If the classifier is not in training train it
+        if classifier.classifierStatus != "training":
+            classifier.classifierStatus = "training"
+            db.session.add(classifier)
+            db.session.commit()
+            loop = asyncio.get_running_loop()
+            result = await initializeClassifier(loop)
+            return classifier.classifierStatus
+        else:
+            return classifier.classifierStatus
+        
+
+       
+
 
 
     schema = make_executable_schema(type_defs, [query, mutation])
