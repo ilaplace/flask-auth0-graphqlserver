@@ -288,7 +288,16 @@ async def graphql_server():
 # TODO: Use the domain environment variable
 # TODO: Make sure the file name is unique
 # TODO: Since this is an API don't flash but send response
-
+@route_cors(
+    allow_origin='http://localhost:3000', 
+    allow_methods=["POST","GET"],
+    allow_headers='*')
+@APP.route('/api/diagnose', methods=['POST'])
+@requires_auth
+async def diagnose():
+    data = await request.data
+    print(data)
+    return "success", 200
 
 @route_cors(
     allow_origin='http://localhost:3000', 
@@ -334,7 +343,6 @@ async def upload_file():
         db.session.add(classifier)
         db.session.commit()
 
-    
     return jsonify(message=message), 200
 
 # Create a SQLDatabase from the uploaded excel file
@@ -373,16 +381,6 @@ async def initializeClassifier(loop):
     user_id = _request_ctx_stack.top.current_user.get('sub')
     if not (User.query.get(user_id)):
         print("No database found")
-    
-    # TODO: get the requested dude's data
-    patient = Patient.query.get(user_id)
-
-    # TODO: set the user id
-    # create a new classifier
-    #classifier = Classifier(user_id=1, classifierStatus="training")
-
-    #modify the exisitng classifier
-
 
     r = db.session.query(Patient,Feature).outerjoin(Feature, Patient.id == Feature.patient_id).all()
     
@@ -398,7 +396,6 @@ async def initializeClassifier(loop):
         db.session.add(classifier)
         db.session.commit()
         return "success"
-
 
 
 async def broadcast(data):
@@ -454,6 +451,8 @@ if __name__ == "__main__":
     mutation = MutationType()
     subscription = SubscriptionType()
 
+
+
     @query.field("hello")
     def resolve_hello(_, info):
         request = info.context
@@ -462,12 +461,16 @@ if __name__ == "__main__":
         #return "Hello, %s" % request.headers
         return  "yello"
     
+
+
     @query.field("checkStatus")
     def resolve_chech_status(_,info):
         user_id = _request_ctx_stack.top.current_user.get('sub')
         classifier = Classifier.query.filter_by(user_id=user_id).first()
         print(classifier.classifierStatus)
         return classifier.classifierStatus
+
+
 
     @mutation.field("sum")
     def resolve_sum(_, info, a, b):
@@ -486,12 +489,12 @@ if __name__ == "__main__":
 
         return c
 
+
+
     @mutation.field("startTraining")
     async def resolve_train(_, info):
-       
         user_id = _request_ctx_stack.top.current_user.get('sub')
         classifier = Classifier.query.filter_by(user_id=user_id).first()
-        
         # If the classifier is not in training train it
         if classifier.classifierStatus != "training":
             classifier.classifierStatus = "training"
@@ -505,9 +508,5 @@ if __name__ == "__main__":
         
 
        
-
-
-
     schema = make_executable_schema(type_defs, [query, mutation])
-
     APP.run(host="127.0.0.1", port=env.get("PORT", 3010), debug=True)
