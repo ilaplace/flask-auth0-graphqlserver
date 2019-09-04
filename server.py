@@ -90,6 +90,7 @@ class Classifier(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     classifierStatus = db.Column(db.String, nullable=True)
     featrues = db.relationship('Feature', backref='classifier',lazy=True)
+    numberOfFeatureTypes = db.Column(db.Integer)
     def __repr__(self):
         return self.id
 
@@ -336,12 +337,16 @@ async def upload_file():
         if not (User.query.get(user_id)):
             db.session.add(this_user)
             db.session.commit()
-
-        importDatabase(filename, user_id)
+        
 
         classifier = Classifier(user_id=user_id, classifierStatus="untrained")
+
+        # TODO: Do the counting before commiting
+        classifier.numberOfFeatureTypes = 3
         db.session.add(classifier)
         db.session.commit()
+
+        importDatabase(filename, user_id)
 
     return jsonify(message=message), 200
 
@@ -354,9 +359,9 @@ def importDatabase(filename, user):
     
     for index, row in df.iterrows():
         new_patient = Patient(user_id=user, status="undiag")
-        featureA = Feature(featureName='A', featureValue=str(row[0]))
-        featureB = Feature(featureName='B', featureValue=str(row[1]))
-        featureC = Feature(featureName='C', featureValue=str(row[2]))
+        featureA = Feature(featureName='A', featureValue=str(row[0]),classifier_id=1)
+        featureB = Feature(featureName='B', featureValue=str(row[1]),classifier_id=1)
+        featureC = Feature(featureName='C', featureValue=str(row[2]),classifier_id=1)
         new_patient.features.append(featureA)
         new_patient.features.append(featureB)
         new_patient.features.append(featureC)
@@ -398,59 +403,59 @@ async def initializeClassifier(loop):
         return "success"
 
 
-async def broadcast(data):
-    for queue in APP.clients:
-        await queue.put(data)
-    return jsonify(True)
-
-# To send events to frontend
-@route_cors(
-    allow_headers='*',
-    allow_origin='http://localhost:3000', 
-    allow_methods=["POST","GET"],
-    allow_credentials=True
-    )
-@APP.route('/sse')
-async def sse():
-    queue = asyncio.Queue()
-    APP.clients.add(queue)
-    async def send_events():
-        while True:
-            try:
-                data = await queue.get()
-                event = ServerSentEvent(data)
-                yield event.encode()
-            except asyncio.CancelledError as error:
-                APP.clients.remove(queue)
-                print(error)
-
-    response = await make_response(
-        send_events(),
-        {
-            'Content-Type': 'text/event-stream',
-            'Cache-Control': 'no-cache',
-            'Transfer-Encoding': 'chunked',
-        },
-    )
-    response.timeout = None
-    return response
-
-
-
 if __name__ == "__main__":
     type_defs = """
         type Query {
             hello: String!
-            checkStatus: String!}
+            checkStatus: String!
+            getClassifier: Classifier!
+            }
+    
         type Mutation {
             sum(a: Int!, b: Int!): Int!
-            startTraining: String!}  
+            startTraining: String!
+            } 
+
+        type Features {
+            featureId: ID!
+            featureName: String!
+            featureValue: String!
+            featureSelected: Boolean!
+            } 
+
+        type Classifier {
+            id: ID!
+            user_id: ID!
+            classifierStatus: String!
+            features: Features
+            numberOfFeatureTypes: Int
+            }
     """
 
     query = QueryType()
     mutation = MutationType()
-    subscription = SubscriptionType()
 
+
+    # Return how much feature type user has
+    @query.field("getClassifier")
+    def resolve_get_classifier(_, info):
+        #user = _request_ctx_stack.top.current_user.get('sub')
+
+        classifier = Classifier.query.filter_by(user_id="auth0|5d4e9c66cbc3f00ebaead4be").first()
+
+        # r = Feature.query.with_entities(Feature.featureName).filter_by(classifier_id=classifier.id).distinct().count()
+
+
+
+        ## Constructing the table from the classifer migth be implemented not here probably though
+
+        # r = db.session.query(Classifier,Feature).outerjoin(Feature,Classifier.id == Feature.classifier_id).all()
+        
+        # a = np.arange(15).reshape(5,3)
+        # for element in a.flat:
+        #     a.flat[element] = np.int64(r[element].Feature.featureValue)
+        #print(a)
+        return classifier
 
 
     @query.field("hello")
