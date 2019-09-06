@@ -78,7 +78,6 @@ class Patient(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     status = db.Column(db.String, nullable=False)
     features = db.relationship('Feature', backref='patient', lazy=False)
-
     def __repr__(self):
         return self.id
 
@@ -89,7 +88,6 @@ class Feature(db.Model):
     featureValue = db.Column(db.String(20), nullable=True)
     patient_id = db.Column(db.Integer, db.ForeignKey('patient.id'))
     classifier_id = db.Column(db.Integer, db.ForeignKey('classifier.id'))
-
     def __repr__(self):
         return self.featureValue
 
@@ -98,9 +96,8 @@ class Classifier(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     classifierStatus = db.Column(db.String, nullable=True)
-    featrues = db.relationship('Feature', backref='classifier', lazy=True)
+    features = db.relationship('Feature', backref='classifier', lazy=True)
     numberOfFeatureTypes = db.Column(db.Integer)
-
     def __repr__(self):
         return self.id
 
@@ -438,19 +435,20 @@ if __name__ == "__main__":
             startTraining: String!
             } 
 
-        type Features {
-            featureId: ID!
+        type Feature {
+            id: ID!
             featureName: String!
             featureValue: String!
-            featureSelected: Boolean!
+            patient_id: String!
+            classifier_id: String!
             } 
 
         type Classifier {
             id: ID!
             user_id: ID!
             classifierStatus: String!
-            features: Features
-            numberOfFeatureTypes: Int
+            features: [Feature]
+            featureTypes: [String]
             }
     """
 
@@ -465,8 +463,10 @@ if __name__ == "__main__":
         classifier = Classifier.query.filter_by(
             user_id="auth0|5d4e9c66cbc3f00ebaead4be").first()
 
-        # r = Feature.query.with_entities(Feature.featureName).filter_by(classifier_id=classifier.id).distinct().count()
-
+        #Add payload the distinct features array so that the table can be constructed accordingly
+        r = Feature.query.with_entities(Feature.featureName).filter_by(classifier_id=classifier.id).distinct()
+        classifier.featureTypes = r
+       
         # Constructing the table from the classifer migth be implemented not here probably though
 
         # r = db.session.query(Classifier,Feature).outerjoin(Feature,Classifier.id == Feature.classifier_id).all()
