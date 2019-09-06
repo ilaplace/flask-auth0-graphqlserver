@@ -44,12 +44,14 @@ APP.secret_key = 'super secret key'
 APP.config['SESSION_TYPE'] = 'filesystem'
 APP.clients = set()
 
-APP = cors(APP,    
-    allow_origin='http://localhost:3000', 
-    allow_methods='*',
-    allow_headers='*',
-    allow_credentials=True
-    )
+APP = cors(APP,
+           allow_origin='http://localhost:3000',
+           allow_methods='*',
+           allow_headers='*',
+           allow_credentials=True
+           )
+
+
 class PatientStatus(enum.Enum):
     DIAGNOSED = 1
     FAILED = 2
@@ -60,50 +62,61 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+
 class User(db.Model):
     id = db.Column(db.String(20), primary_key=True)
     mail = db.Column(db.String(50), nullable=False)
     patients = db.relationship('Patient', backref='user', lazy=True)
     classifiers = db.relationship('Classifier', backref='user', lazy=True)
+
     def __repr__(self):
         return self.mail
+
 
 class Patient(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     status = db.Column(db.String, nullable=False)
-    features = db.relationship('Feature', backref='patient',lazy=False)
+    features = db.relationship('Feature', backref='patient', lazy=False)
+
     def __repr__(self):
         return self.id
 
+
 class Feature(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    featureName = db.Column(db.String(20),nullable=False)
-    featureValue = db.Column(db.String(20),nullable=True)
+    featureName = db.Column(db.String(20), nullable=False)
+    featureValue = db.Column(db.String(20), nullable=True)
     patient_id = db.Column(db.Integer, db.ForeignKey('patient.id'))
     classifier_id = db.Column(db.Integer, db.ForeignKey('classifier.id'))
+
     def __repr__(self):
         return self.featureValue
+
 
 class Classifier(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     classifierStatus = db.Column(db.String, nullable=True)
-    featrues = db.relationship('Feature', backref='classifier',lazy=True)
+    featrues = db.relationship('Feature', backref='classifier', lazy=True)
     numberOfFeatureTypes = db.Column(db.Integer)
+
     def __repr__(self):
         return self.id
 
 
-# Example table 
+# Example table
 class Summation(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user = db.Column(db.String(35))
     sum = db.Column(db.Integer)
+
     def __repr__(self):
         return '<Sum %d>' % self.sum
 
 # Format error response and append status code.
+
+
 class AuthError(Exception):
     def __init__(self, error, status_code):
         self.error = error
@@ -123,24 +136,24 @@ def get_token_auth_header():
     auth = request.headers.get("Authorization", None)
     if not auth:
         raise AuthError({"code": "authorization_header_missing",
-                        "description":
-                            "Authorization header is expected"}, 401)
+                         "description":
+                         "Authorization header is expected"}, 401)
 
     parts = auth.split()
 
     if parts[0].lower() != "bearer":
         raise AuthError({"code": "invalid_header",
-                        "description":
-                            "Authorization header must start with"
-                            " Bearer"}, 401)
+                         "description":
+                         "Authorization header must start with"
+                         " Bearer"}, 401)
     elif len(parts) == 1:
         raise AuthError({"code": "invalid_header",
-                        "description": "Token not found"}, 401)
+                         "description": "Token not found"}, 401)
     elif len(parts) > 2:
         raise AuthError({"code": "invalid_header",
-                        "description":
-                            "Authorization header must be"
-                            " Bearer token"}, 401)
+                         "description":
+                         "Authorization header must be"
+                         " Bearer token"}, 401)
 
     token = parts[1]
     return token
@@ -173,14 +186,14 @@ def requires_auth(f):
             unverified_header = jwt.get_unverified_header(token)
         except jwt.JWTError:
             raise AuthError({"code": "invalid_header",
-                            "description":
-                                "Invalid header. "
-                                "Use an RS256 signed JWT Access Token"}, 401)
+                             "description":
+                             "Invalid header. "
+                             "Use an RS256 signed JWT Access Token"}, 401)
         if unverified_header["alg"] == "HS256":
             raise AuthError({"code": "invalid_header",
-                            "description":
-                                "Invalid header. "
-                                "Use an RS256 signed JWT Access Token"}, 401)
+                             "description":
+                             "Invalid header. "
+                             "Use an RS256 signed JWT Access Token"}, 401)
         rsa_key = {}
         for key in jwks["keys"]:
             if key["kid"] == unverified_header["kid"]:
@@ -202,22 +215,22 @@ def requires_auth(f):
                 )
             except jwt.ExpiredSignatureError:
                 raise AuthError({"code": "token_expired",
-                                "description": "token is expired"}, 401)
+                                 "description": "token is expired"}, 401)
             except jwt.JWTClaimsError:
                 raise AuthError({"code": "invalid_claims",
-                                "description":
-                                    "incorrect claims,"
-                                    " please check the audience and issuer"}, 401)
+                                 "description":
+                                 "incorrect claims,"
+                                 " please check the audience and issuer"}, 401)
             except Exception:
                 raise AuthError({"code": "invalid_header",
-                                "description":
-                                    "Unable to parse authentication"
-                                    " token."}, 401)
+                                 "description":
+                                 "Unable to parse authentication"
+                                 " token."}, 401)
 
             _request_ctx_stack.top.current_user = payload
             return f(*args, **kwargs)
         raise AuthError({"code": "invalid_header",
-                        "description": "Unable to find appropriate key"}, 401)
+                         "description": "Unable to find appropriate key"}, 401)
     return decorated
 
 
@@ -239,7 +252,7 @@ def private():
     return jsonify(message=response)
 
 
-#unused 
+# unused
 @APP.route("/api/private-scoped")
 @requires_auth
 def private_scoped():
@@ -264,10 +277,11 @@ def graphql_playgroud():
 
 # TODO: update route to /api/graphql
 
+
 @route_cors(
-    allow_origin="http://127.0.0.1:3000", 
-    allow_methods=["POST","GET"],
-    allow_headers=["Authorization","Content-Type"])
+    allow_origin="http://127.0.0.1:3000",
+    allow_methods=["POST", "GET"],
+    allow_headers=["Authorization", "Content-Type"])
 @APP.route("/graphql", methods=["POST"])
 @requires_auth
 async def graphql_server():
@@ -276,11 +290,11 @@ async def graphql_server():
 
     # Note: Passing the request to the context is optional.
     # In Flask, the current request is always accessible as flask.request
-     
+
     success, result = await graphql(
         schema,
         data,
-        context_value = request
+        context_value=request
     )
 
     status_code = 200 if success else 400
@@ -289,9 +303,11 @@ async def graphql_server():
 # TODO: Use the domain environment variable
 # TODO: Make sure the file name is unique
 # TODO: Since this is an API don't flash but send response
+
+
 @route_cors(
-    allow_origin='http://localhost:3000', 
-    allow_methods=["POST","GET"],
+    allow_origin='http://localhost:3000',
+    allow_methods=["POST", "GET"],
     allow_headers='*')
 @APP.route('/api/diagnose', methods=['POST'])
 @requires_auth
@@ -300,9 +316,10 @@ async def diagnose():
     print(data)
     return "success", 200
 
+
 @route_cors(
-    allow_origin='http://localhost:3000', 
-    allow_methods=["POST","GET"],
+    allow_origin='http://localhost:3000',
+    allow_methods=["POST", "GET"],
     allow_headers='*')
 @APP.route('/api/upload', methods=['POST'])
 @requires_auth
@@ -319,25 +336,25 @@ async def upload_file():
         message = filename
         file_path = os.path.join(APP.config['UPLOAD_FOLDER'], filename)
         user_id = _request_ctx_stack.top.current_user.get('sub')
-        
-        # this is not necessary as the file ereased 
+
+        # this is not necessary as the file ereased
         # if os.path.exists(file_path):
         #     await importDatabase(filename, user_id)
-        #     return jsonify(message="file already exists"), 200   
+        #     return jsonify(message="file already exists"), 200
 
         file.save(os.path.join(APP.config['UPLOAD_FOLDER'], filename))
-        
-        #TODO: Check if the user exists
+
+        # TODO: Check if the user exists
         user_id = _request_ctx_stack.top.current_user.get('sub')
-        #Get the mail from the access token which is modified by the help of the help of the auth0 rules
-        mail = _request_ctx_stack.top.current_user.get('https://dev-yy8du86w.eu/mail')
-        
+        # Get the mail from the access token which is modified by the help of the help of the auth0 rules
+        mail = _request_ctx_stack.top.current_user.get(
+            'https://dev-yy8du86w.eu/mail')
+
         this_user = User(id=user_id, mail=mail)
-        #Do not create a user object if it already exists
+        # Do not create a user object if it already exists
         if not (User.query.get(user_id)):
             db.session.add(this_user)
             db.session.commit()
-        
 
         classifier = Classifier(user_id=user_id, classifierStatus="untrained")
 
@@ -354,42 +371,47 @@ async def upload_file():
 # This is just for a specific database
 # TODO: Surround with try catch
 # TODO: This needs to go to a seperate thread
+
+
 def importDatabase(filename, user):
-    df = pd.read_excel(os.path.join(APP.config['UPLOAD_FOLDER'],filename))
-    
+    df = pd.read_excel(os.path.join(APP.config['UPLOAD_FOLDER'], filename))
+
     for index, row in df.iterrows():
         new_patient = Patient(user_id=user, status="undiag")
-        featureA = Feature(featureName='A', featureValue=str(row[0]),classifier_id=1)
-        featureB = Feature(featureName='B', featureValue=str(row[1]),classifier_id=1)
-        featureC = Feature(featureName='C', featureValue=str(row[2]),classifier_id=1)
+        featureA = Feature(
+            featureName='A', featureValue=str(row[0]), classifier_id=1)
+        featureB = Feature(
+            featureName='B', featureValue=str(row[1]), classifier_id=1)
+        featureC = Feature(
+            featureName='C', featureValue=str(row[2]), classifier_id=1)
         new_patient.features.append(featureA)
         new_patient.features.append(featureB)
         new_patient.features.append(featureC)
         db.session.add(new_patient)
         db.session.commit()
-    
-    os.remove(os.path.join(APP.config['UPLOAD_FOLDER'],filename))
+
+    os.remove(os.path.join(APP.config['UPLOAD_FOLDER'], filename))
 
 
 # simulating a CPU bound task
 def train(classifier):
     sum(i * i for i in range(10 ** 7))
-    
+
     classifier.classifierStatus = "done"
     return classifier
 
 
-
-# Initialize a classifier from the all available features 
+# Initialize a classifier from the all available features
 # TODO: User must be blocked from asking to training multiple times
 async def initializeClassifier(loop):
     user_id = _request_ctx_stack.top.current_user.get('sub')
     if not (User.query.get(user_id)):
         print("No database found")
 
-    r = db.session.query(Patient,Feature).outerjoin(Feature, Patient.id == Feature.patient_id).all()
-    
-    a = np.arange(15).reshape(5,3)
+    r = db.session.query(Patient, Feature).outerjoin(
+        Feature, Patient.id == Feature.patient_id).all()
+
+    a = np.arange(15).reshape(5, 3)
     for element in a.flat:
         a.flat[element] = np.int64(r[element].Feature.featureValue)
     print(a)
@@ -435,66 +457,57 @@ if __name__ == "__main__":
     query = QueryType()
     mutation = MutationType()
 
-
     # Return how much feature type user has
     @query.field("getClassifier")
     def resolve_get_classifier(_, info):
         #user = _request_ctx_stack.top.current_user.get('sub')
-
-        classifier = Classifier.query.filter_by(user_id="auth0|5d4e9c66cbc3f00ebaead4be").first()
+        ## TODO: Get the user id
+        classifier = Classifier.query.filter_by(
+            user_id="auth0|5d4e9c66cbc3f00ebaead4be").first()
 
         # r = Feature.query.with_entities(Feature.featureName).filter_by(classifier_id=classifier.id).distinct().count()
 
-
-
-        ## Constructing the table from the classifer migth be implemented not here probably though
+        # Constructing the table from the classifer migth be implemented not here probably though
 
         # r = db.session.query(Classifier,Feature).outerjoin(Feature,Classifier.id == Feature.classifier_id).all()
-        
+
         # a = np.arange(15).reshape(5,3)
         # for element in a.flat:
         #     a.flat[element] = np.int64(r[element].Feature.featureValue)
-        #print(a)
+        # print(a)
         return classifier
-
 
     @query.field("hello")
     def resolve_hello(_, info):
         request = info.context
         #user_agent = request.headers.get("User-Agent","Guest")
         muser = _request_ctx_stack.top.current_user.get('sub')
-        #return "Hello, %s" % request.headers
-        return  "yello"
-    
-
+        # return "Hello, %s" % request.headers
+        return "yello"
 
     @query.field("checkStatus")
-    def resolve_chech_status(_,info):
+    def resolve_chech_status(_, info):
         user_id = _request_ctx_stack.top.current_user.get('sub')
         classifier = Classifier.query.filter_by(user_id=user_id).first()
         print(classifier.classifierStatus)
         return classifier.classifierStatus
 
-
-
     @mutation.field("sum")
     def resolve_sum(_, info, a, b):
-        c = a + b 
-        # to create a new record of summation 
+        c = a + b
+        # to create a new record of summation
         muser = _request_ctx_stack.top.current_user.get('sub')
         mus = Summation.query.filter_by(user=muser).first()
         sumasyon = Summation(user=muser, sum=c)
-        
+
         # modify the existing record
-        #mus.sum = c 
-        #db.session.add(mus)
-       
+        #mus.sum = c
+        # db.session.add(mus)
+
         db.session.add(sumasyon)
         db.session.commit()
 
         return c
-
-
 
     @mutation.field("startTraining")
     async def resolve_train(_, info):
@@ -510,8 +523,6 @@ if __name__ == "__main__":
             return classifier.classifierStatus
         else:
             return classifier.classifierStatus
-        
 
-       
     schema = make_executable_schema(type_defs, [query, mutation])
     APP.run(host="127.0.0.1", port=env.get("PORT", 3010), debug=True)
