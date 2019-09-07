@@ -472,7 +472,7 @@ if __name__ == "__main__":
     # Return how much feature type user has
     @query.field("getClassifier")
     def resolve_get_classifier(_, info):
-        user = _request_ctx_stack.top.current_user.get('sub')
+        user_id = _request_ctx_stack.top.current_user.get('sub')
         classifier = Classifier.query.filter_by(user_id=user_id).first()
 
         # Add payload the distinct features array so that the table can be constructed accordingly
