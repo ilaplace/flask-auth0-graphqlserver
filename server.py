@@ -7,7 +7,7 @@ from os import environ as env
 from six.moves.urllib.request import urlopen
 from dotenv import load_dotenv, find_dotenv
 from quart import Quart, request, jsonify, _request_ctx_stack, flash, make_response
-from quart_cors import cors, route_cors, websocket_cors
+from quart_cors import cors, route_cors
 import quart.flask_patch
 from jose import jwt
 from ariadne import QueryType, graphql, make_executable_schema, MutationType, upload_scalar, SubscriptionType
@@ -20,7 +20,6 @@ import numpy as np
 import enum
 import asyncio
 
-import multiprocessing
 import concurrent.futures
 from serversentevent import ServerSentEvent
 
