@@ -75,7 +75,7 @@ class User(db.Model):
 
 class Patient(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    user_id = db.Column(db.String(20), db.ForeignKey('user.id'))
     status = db.Column(db.String, nullable=False)
     features = db.relationship('Feature', backref='patient', lazy=False)
 
@@ -360,7 +360,6 @@ async def upload_file():
         classifier = Classifier(user_id=user_id, classifierStatus="untrained")
 
         # TODO: Do the counting before commiting
-        classifier.numberOfFeatureTypes = 3
         db.session.add(classifier)
         db.session.commit()
 
@@ -396,9 +395,10 @@ def importDatabase(filename, user):
 
 # simulating a CPU bound task
 def train(classifier):
-    sum(i * i for i in range(10 ** 7))
+    sum(i * i for i in range(10 ** 6))
 
     classifier.classifierStatus = "done"
+    print("doneeee")
     return classifier
 
 
@@ -464,7 +464,14 @@ if __name__ == "__main__":
     def resolve_delete_database(_, info):
         user_id = _request_ctx_stack.top.current_user.get('sub')
         classifier = Classifier.query.filter_by(user_id=user_id).first()
+        if classifier is None:
+            return "failed"
         r = Classifier.query.get(classifier.id)
+        p = Patient.query.filter_by(user_id=user_id).all()
+        for patient in p:
+            db.session.delete(patient)
+        
+        #db.session.delete(p)
         db.session.delete(r)
         db.session.commit()
         return "deleted"
@@ -474,11 +481,13 @@ if __name__ == "__main__":
     def resolve_get_classifier(_, info):
         user_id = _request_ctx_stack.top.current_user.get('sub')
         classifier = Classifier.query.filter_by(user_id=user_id).first()
-
+        if classifier is None:
+            return "failed"
         # Add payload the distinct features array so that the table can be constructed accordingly
         r = Feature.query.with_entities(Feature.featureName).filter_by(
             classifier_id=classifier.id).distinct()
         classifier.featureTypes = r
+        print(classifier.classifierStatus)
         return classifier
 
     @query.field("hello")
@@ -493,6 +502,8 @@ if __name__ == "__main__":
     def resolve_chech_status(_, info):
         user_id = _request_ctx_stack.top.current_user.get('sub')
         classifier = Classifier.query.filter_by(user_id=user_id).first()
+        if classifier is None:
+            return "failed"
         print(classifier.classifierStatus)
         return classifier.classifierStatus
 
@@ -518,15 +529,14 @@ if __name__ == "__main__":
         user_id = _request_ctx_stack.top.current_user.get('sub')
         classifier = Classifier.query.filter_by(user_id=user_id).first()
         # If the classifier is not in training train it
-        if classifier.classifierStatus != "training":
+        if classifier.classifierStatus == "untrained":
             classifier.classifierStatus = "training"
-            db.session.add(classifier)
-            db.session.commit()
-            loop = asyncio.get_running_loop()
-            result = await initializeClassifier(loop)
-            return classifier.classifierStatus
-        else:
-            return classifier.classifierStatus
+        #db.session.add(classifier)
+        #db.session.commit()
+        loop = asyncio.get_running_loop()
+        result = await initializeClassifier(loop)
+        return classifier.classifierStatus
+
 
     schema = make_executable_schema(type_defs, [query, mutation])
     APP.run(host="127.0.0.1", port=env.get("PORT", 3010), debug=True)
