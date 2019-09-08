@@ -451,7 +451,7 @@ if __name__ == "__main__":
         type Classifier {
             id: ID!
             user_id: ID!
-            classifierStatus: String!
+            classifierStatus: String
             features: [Feature]
             featureTypes: [String]
             }
@@ -482,6 +482,7 @@ if __name__ == "__main__":
         user_id = _request_ctx_stack.top.current_user.get('sub')
         classifier = Classifier.query.filter_by(user_id=user_id).first()
         if classifier is None:
+            print("failed to get the classifer")
             return "failed"
         # Add payload the distinct features array so that the table can be constructed accordingly
         r = Feature.query.with_entities(Feature.featureName).filter_by(
