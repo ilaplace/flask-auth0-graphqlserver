@@ -539,4 +539,4 @@ if __name__ == "__main__":
 
 
     schema = make_executable_schema(type_defs, [query, mutation])
-    APP.run(host="127.0.0.1", port=env.get("PORT", 3010), debug=True)
+    APP.run(host="0.0.0.0", port=env.get("PORT", 8000), debug=True)
