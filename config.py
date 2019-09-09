@@ -4,7 +4,7 @@ class Config(object):
     SQLALCHEMY_DATABASE_URI = "sqlite:///test.db"
     secret_key = 'super secret key'
     SESSION_TYPE = 'filesystem'
-
+    ENV=production
 class ProductionConfig(Config):
     SERVER = "127.0.0.1"
     FRONTEND_URI = "https://diagnostician-frontend.herokuapp.com/"
