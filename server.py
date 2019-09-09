@@ -45,7 +45,7 @@ else:
 
 ORIGIN_URI = APP.config["FRONTEND_URI"]
 
-print(f'ENV is set to: {APP.config["ENV"]}')
+print(f'Production: {is_prod}')
 
 APP.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 db = SQLAlchemy(APP)
