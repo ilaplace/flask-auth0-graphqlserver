@@ -33,18 +33,26 @@ API_IDENTIFIER = env.get("API_IDENTIFIER")
 ALGORITHMS = ["RS256"]
 
 UPLOAD_FOLDER = os.getcwd() + '/uploads'
+
 ALLOWED_EXTENSIONS = {'xlsx'}
 APP = Quart(__name__)
-APP.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///test.db'
+
+if APP.config["ENV"] == "production":
+    APP.config.from_object("config.ProductionConfig")
+else:
+    APP.config.from_object("config.DevelopmentConfig")
+
+ORIGIN_URI = APP.config["FRONTEND_URI"]
+
+print(f'ENV is set to: {APP.config["ENV"]}')
+
 APP.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 db = SQLAlchemy(APP)
 
-APP.secret_key = 'super secret key'
-APP.config['SESSION_TYPE'] = 'filesystem'
-APP.clients = set()
+
 
 APP = cors(APP,
-           allow_origin='http://localhost:3000',
+           allow_origin=ORIGIN_URI,
            allow_methods='*',
            allow_headers='*',
            allow_credentials=True
@@ -279,7 +287,7 @@ def graphql_playgroud():
 
 
 @route_cors(
-    allow_origin="http://127.0.0.1:3000",
+    allow_origin=ORIGIN_URI,
     allow_methods=["POST", "GET"],
     allow_headers=["Authorization", "Content-Type"])
 @APP.route("/graphql", methods=["POST"])
@@ -306,7 +314,7 @@ async def graphql_server():
 
 
 @route_cors(
-    allow_origin='http://localhost:3000',
+    allow_origin=ORIGIN_URI,
     allow_methods=["POST", "GET"],
     allow_headers='*')
 @APP.route('/api/diagnose', methods=['POST'])
@@ -318,7 +326,7 @@ async def diagnose():
 
 
 @route_cors(
-    allow_origin='http://localhost:3000',
+    allow_origin=ORIGIN_URI,
     allow_methods=["POST", "GET"],
     allow_headers='*')
 @APP.route('/api/upload', methods=['POST'])
@@ -537,6 +545,6 @@ if __name__ == "__main__":
         result = await initializeClassifier(loop)
         return classifier.classifierStatus
 
-
+    
     schema = make_executable_schema(type_defs, [query, mutation])
-    APP.run(host="0.0.0.0", port=env.get("PORT", 8000), debug=True)
+    APP.run(host=APP.config['SERVER'], port=env.get("PORT", 8000))
