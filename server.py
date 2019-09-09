@@ -172,8 +172,8 @@ async def resolve_train(_, info):
     result = await initializeClassifier(loop)
     return classifier.classifierStatus
 
-port = int(os.environ.get('PORT', 8000))
-APP.run(host=APP.config['SERVER'], port=port)
+#port = int(os.environ.get('PORT', 8000))
+#APP.run(host=APP.config['SERVER'], port=port)
 
 
 class PatientStatus(enum.Enum):
