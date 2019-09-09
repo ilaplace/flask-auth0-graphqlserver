@@ -546,6 +546,6 @@ if __name__ == "__main__":
         result = await initializeClassifier(loop)
         return classifier.classifierStatus
 
-    
+    port = int(os.environ.get('PORT', 8000))
     schema = make_executable_schema(type_defs, [query, mutation])
-    APP.run(host=APP.config['SERVER'], port=int(os.environ.get('PORT', 8000))
+    APP.run(host=APP.config['SERVER'], port=port)
