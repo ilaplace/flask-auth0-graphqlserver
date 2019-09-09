@@ -37,7 +37,8 @@ UPLOAD_FOLDER = os.getcwd() + '/uploads'
 ALLOWED_EXTENSIONS = {'xlsx'}
 APP = Quart(__name__)
 
-if APP.config["ENV"] == "production":
+is_prod = os.environ.get('IS_HEROKU', None)
+if is_prod:
     APP.config.from_object("config.ProductionConfig")
 else:
     APP.config.from_object("config.DevelopmentConfig")
