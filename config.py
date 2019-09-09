@@ -7,7 +7,7 @@ class Config(object):
 
 class ProductionConfig(Config):
     SERVER = "127.0.0.1"
-    FRONTEND_URI = "https://diagnostician-frontend.herokuapp.com/"
+    FRONTEND_URI = "https://diagnostician-frontend.herokuapp.com"
 
 
 class DevelopmentConfig(Config):
