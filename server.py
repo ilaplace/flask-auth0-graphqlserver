@@ -275,7 +275,10 @@ def private_scoped():
         "description": "You don't have access to this resource"
     }, 403)
 
-
+@route_cors(
+    allow_origin=ORIGIN_URI,
+    allow_methods=["*"],
+    allow_headers=["Authorization", "Content-Type"])
 @APP.route("/graphql", methods=["GET"])
 def graphql_playgroud():
     # On GET request serve GraphQL Playground
@@ -289,7 +292,7 @@ def graphql_playgroud():
 
 @route_cors(
     allow_origin=ORIGIN_URI,
-    allow_methods=["POST", "GET"],
+    allow_methods=["*"],
     allow_headers=["Authorization", "Content-Type"])
 @APP.route("/graphql", methods=["POST"])
 @requires_auth
@@ -316,7 +319,7 @@ async def graphql_server():
 
 @route_cors(
     allow_origin=ORIGIN_URI,
-    allow_methods=["POST", "GET"],
+    allow_methods=["*"],
     allow_headers='*')
 @APP.route('/api/diagnose', methods=['POST'])
 @requires_auth
@@ -328,7 +331,7 @@ async def diagnose():
 
 @route_cors(
     allow_origin=ORIGIN_URI,
-    allow_methods=["POST", "GET"],
+    allow_methods=["*"],
     allow_headers='*')
 @APP.route('/api/upload', methods=['POST'])
 @requires_auth
