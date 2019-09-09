@@ -4,6 +4,7 @@ class Config(object):
     SQLALCHEMY_DATABASE_URI = "sqlite:///test.db"
     secret_key = 'super secret key'
     SESSION_TYPE = 'filesystem'
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
 
 class ProductionConfig(Config):
     SERVER = "127.0.0.1"
