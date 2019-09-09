@@ -1,1 +1,1 @@
-web: python server.py
+web: hypercorn -b 0.0.0.0:${PORT} server:APP

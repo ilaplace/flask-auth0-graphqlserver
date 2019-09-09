@@ -8,3 +8,4 @@ ariadne
 numpy
 pandas
 xlrd
+hypercorn
