@@ -470,6 +470,7 @@ if __name__ == "__main__":
 
     query = QueryType()
     mutation = MutationType()
+    schema = make_executable_schema(type_defs, [query, mutation])
 
     @mutation.field("deleteDatabase")
     def resolve_delete_database(_, info):
@@ -550,5 +551,4 @@ if __name__ == "__main__":
         return classifier.classifierStatus
 
     port = int(os.environ.get('PORT', 8000))
-    schema = make_executable_schema(type_defs, [query, mutation])
     APP.run(host=APP.config['SERVER'], port=port)
