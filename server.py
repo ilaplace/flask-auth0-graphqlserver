@@ -64,7 +64,7 @@ type_defs = """
     type Query {
         hello: String!
         checkStatus: String!
-        getClassifier: Classifier!
+        getClassifier: Classifier
         }
 
     type Mutation {
