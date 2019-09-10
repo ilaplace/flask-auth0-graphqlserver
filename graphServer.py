@@ -1,12 +1,14 @@
-from quart import Blueprint, jsonify
+from quart import Blueprint, jsonify, _request_ctx_stack, current_app, request
 from quart_cors import route_cors
-from ariadne import QueryType, graphql, make_executable_schema, MutationType,_request_ctx_stack
+from ariadne import QueryType, graphql, make_executable_schema, MutationType
 import pandas as pd
 import numpy as np
 import os
-
+from auth_helper import requires_auth
 from ariadne.constants import PLAYGROUND_HTML
+from models import Classifier, Feature, Patient, User, db
 blueprint = Blueprint('GraphQLServer', __name__)
+
 
 @blueprint.route('/extra/')
 def extra():
@@ -132,10 +134,7 @@ async def resolve_train(_, info):
 schema = make_executable_schema(type_defs, [query, mutation])
 
 
-@route_cors(
-    allow_origin=ORIGIN_URI,
-    allow_methods=["*"],
-    allow_headers=["Authorization", "Content-Type"])
+
 @blueprint.route("/graphql", methods=["GET"])
 def graphql_playgroud():
     # On GET request serve GraphQL Playground
@@ -147,13 +146,10 @@ def graphql_playgroud():
 # TODO: update route to /api/graphql
 
 
-@route_cors(
-    allow_origin=ORIGIN_URI,
-    allow_methods=["*"],
-    allow_headers=["Authorization", "Content-Type"])
 @blueprint.route("/graphql", methods=["POST"])
 @requires_auth
 async def graphql_server():
+    
     # GraphQL queries are always sent as POST
     data = await request.get_json()
 
