@@ -92,7 +92,7 @@ type_defs = """
 
 query = QueryType()
 mutation = MutationType()
-schema = make_executable_schema(type_defs, [query, mutation])
+
 
 @mutation.field("deleteDatabase")
 def resolve_delete_database(_, info):
@@ -174,7 +174,7 @@ async def resolve_train(_, info):
 
 #port = int(os.environ.get('PORT', 8000))
 #APP.run(host=APP.config['SERVER'], port=port)
-
+schema = make_executable_schema(type_defs, [query, mutation])
 
 class PatientStatus(enum.Enum):
     DIAGNOSED = 1
