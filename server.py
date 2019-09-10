@@ -111,42 +111,7 @@ def private_scoped():
         "description": "You don't have access to this resource"
     }, 403)
 
-@route_cors(
-    allow_origin=ORIGIN_URI,
-    allow_methods=["*"],
-    allow_headers=["Authorization", "Content-Type"])
-@APP.route("/graphql", methods=["GET"])
-def graphql_playgroud():
-    # On GET request serve GraphQL Playground
-    # You don't need to provide Playground if you don't want to
-    # but keep on mind this will not prohibit clients from
-    # exploring your API using desktop GraphQL Playground app.
-    return PLAYGROUND_HTML, 200
 
-# TODO: update route to /api/graphql
-
-
-@route_cors(
-    allow_origin=ORIGIN_URI,
-    allow_methods=["*"],
-    allow_headers=["Authorization", "Content-Type"])
-@APP.route("/graphql", methods=["POST"])
-@requires_auth
-async def graphql_server():
-    # GraphQL queries are always sent as POST
-    data = await request.get_json()
-
-    # Note: Passing the request to the context is optional.
-    # In Flask, the current request is always accessible as flask.request
-
-    success, result = await graphql(
-        schema,
-        data,
-        context_value=request
-    )
-
-    status_code = 200 if success else 400
-    return jsonify(result), status_code
 
 # TODO: Use the domain environment variable
 # TODO: Make sure the file name is unique
