@@ -9,29 +9,25 @@ from ariadne.constants import PLAYGROUND_HTML
 from flask_sqlalchemy import SQLAlchemy
 import os
 from werkzeug.utils import secure_filename
-import pandas as pd
-import numpy as np
 import enum
-import asyncio
-import concurrent.futures
+
 import time
 from graphServer import blueprint
-from auth_helper import get_token_auth_header, requires_auth
+from auth_helper import get_token_auth_header, requires_auth, AuthError
 from models import db, Classifier, Feature, Patient, User
 
 
 ENV_FILE = find_dotenv()
 if ENV_FILE:
     load_dotenv(ENV_FILE)
-AUTH0_DOMAIN = env.get("AUTH0_DOMAIN")
-API_IDENTIFIER = env.get("API_IDENTIFIER")
-
 
 UPLOAD_FOLDER = os.getcwd()
-
 ALLOWED_EXTENSIONS = {'xlsx'}
+
 APP = Quart(__name__)
 APP.register_blueprint(blueprint)
+
+# On heroku the environement variable IS_HEROKU becomes true
 is_prod = os.environ.get('IS_HEROKU', None)
 if is_prod:
     APP.config.from_object("config.ProductionConfig")
@@ -64,14 +60,6 @@ def allowed_file(filename):
 
 
 # Format error response and append status code.
-
-
-class AuthError(Exception):
-    def __init__(self, error, status_code):
-        self.error = error
-        self.status_code = status_code
-
-
 @APP.errorhandler(AuthError)
 def handle_auth_error(ex):
     response = jsonify(ex.error)
@@ -139,10 +127,10 @@ async def diagnose():
 async def upload_file():
     message = "unkown file"
     if 'file' not in await request.files:
-        flash('No file part')
+        return jsonify(message="No file part"), 400
     file = (await request.files)['file']
     if file.filename == '':
-        flash('No file selected!')
+         return jsonify(message="No file Selected"), 400
 
     if file and allowed_file(file.filename):
         filename = secure_filename(file.filename)
@@ -203,38 +191,4 @@ def importDatabase(filename, user):
         db.session.commit()
 
     os.remove(os.path.join(APP.config['UPLOAD_FOLDER'], filename))
-
-
-# simulating a CPU bound task
-def train(classifier):
-    sum(i * i for i in range(10 ** 6))
-
-    classifier.classifierStatus = "done"
-    print("doneeee")
-    return classifier
-
-
-# Initialize a classifier from the all available features
-# TODO: User must be blocked from asking to training multiple times
-async def initializeClassifier(loop):
-    user_id = _request_ctx_stack.top.current_user.get('sub')
-    if not (User.query.get(user_id)):
-        print("No database found")
-
-    r = db.session.query(Patient, Feature).outerjoin(
-        Feature, Patient.id == Feature.patient_id).all()
-
-    a = np.arange(15).reshape(5, 3)
-    for element in a.flat:
-        a.flat[element] = np.int64(r[element].Feature.featureValue)
-    print(a)
-
-    with concurrent.futures.ProcessPoolExecutor() as pool:
-        classifier = Classifier.query.filter_by(user_id=user_id).first()
-        trainedClassifier = await loop.run_in_executor(pool, train, classifier)
-        classifier.classifierStatus = trainedClassifier.classifierStatus
-        db.session.add(classifier)
-        db.session.commit()
-        return "success"
-
 

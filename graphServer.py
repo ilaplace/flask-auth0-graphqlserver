@@ -1,12 +1,12 @@
 from quart import Blueprint, jsonify, _request_ctx_stack, current_app, request
 from quart_cors import route_cors
 from ariadne import QueryType, graphql, make_executable_schema, MutationType
-import pandas as pd
-import numpy as np
 import os
+import asyncio
 from auth_helper import requires_auth
 from ariadne.constants import PLAYGROUND_HTML
 from models import Classifier, Feature, Patient, User, db
+from initializeClassifier import initializeClassifier
 blueprint = Blueprint('GraphQLServer', __name__)
 
 
