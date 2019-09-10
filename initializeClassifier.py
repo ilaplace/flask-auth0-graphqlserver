@@ -3,7 +3,9 @@ from models import User, Classifier, Patient, Feature, db
 import pandas as pd
 import numpy as np
 import concurrent.futures
+
 async def initializeClassifier(loop):
+    ''' Called from the startTraining mutation, caller of the train method'''
     user_id = _request_ctx_stack.top.current_user.get('sub')
     if not (User.query.get(user_id)):
         print("No database found")
@@ -31,3 +33,4 @@ def train(classifier):
     classifier.classifierStatus = "done"
     print("doneeee")
     return classifier
+

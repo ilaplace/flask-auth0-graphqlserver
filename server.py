@@ -8,11 +8,12 @@ from ariadne import QueryType, graphql, make_executable_schema, MutationType
 from ariadne.constants import PLAYGROUND_HTML
 from flask_sqlalchemy import SQLAlchemy
 import os
-from werkzeug.utils import secure_filename
+
 import enum
 
 import time
-from graphServer import blueprint
+from graphServer import blueprint_graph
+from fileUpload import blueprint_upload
 from auth_helper import get_token_auth_header, requires_auth, AuthError
 from models import db, Classifier, Feature, Patient, User
 
@@ -22,10 +23,12 @@ if ENV_FILE:
     load_dotenv(ENV_FILE)
 
 UPLOAD_FOLDER = os.getcwd()
-ALLOWED_EXTENSIONS = {'xlsx'}
+
 
 APP = Quart(__name__)
-APP.register_blueprint(blueprint)
+APP.register_blueprint(blueprint_graph)
+APP.register_blueprint(blueprint_upload)
+
 
 # On heroku the environement variable IS_HEROKU becomes true
 is_prod = os.environ.get('IS_HEROKU', None)
@@ -166,11 +169,6 @@ async def upload_file():
         importDatabase(filename, user_id)
 
     return jsonify(message=message), 200
-
-# Create a SQLDatabase from the uploaded excel file
-# This is just for a specific database
-# TODO: Surround with try catch
-# TODO: This needs to go to a seperate thread
 
 
 def importDatabase(filename, user):

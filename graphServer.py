@@ -7,10 +7,11 @@ from auth_helper import requires_auth
 from ariadne.constants import PLAYGROUND_HTML
 from models import Classifier, Feature, Patient, User, db
 from initializeClassifier import initializeClassifier
-blueprint = Blueprint('GraphQLServer', __name__)
+
+blueprint_graph = Blueprint('GraphQLServer', __name__)
 
 
-@blueprint.route('/extra/')
+@blueprint_graph.route('/extra/')
 def extra():
     print("ekstra mk")
     response = "extra mkmk"
@@ -135,7 +136,7 @@ schema = make_executable_schema(type_defs, [query, mutation])
 
 
 
-@blueprint.route("/graphql", methods=["GET"])
+@blueprint_graph.route("/graphql", methods=["GET"])
 def graphql_playgroud():
     # On GET request serve GraphQL Playground
     # You don't need to provide Playground if you don't want to
@@ -146,7 +147,7 @@ def graphql_playgroud():
 # TODO: update route to /api/graphql
 
 
-@blueprint.route("/graphql", methods=["POST"])
+@blueprint_graph.route("/graphql", methods=["POST"])
 @requires_auth
 async def graphql_server():
     
