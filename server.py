@@ -32,7 +32,7 @@ AUTH0_DOMAIN = env.get("AUTH0_DOMAIN")
 API_IDENTIFIER = env.get("API_IDENTIFIER")
 ALGORITHMS = ["RS256"]
 
-UPLOAD_FOLDER = os.getcwd() + '/uploads'
+UPLOAD_FOLDER = os.getcwd()
 
 ALLOWED_EXTENSIONS = {'xlsx'}
 APP = Quart(__name__)
