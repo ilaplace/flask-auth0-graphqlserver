@@ -6,7 +6,7 @@ import asyncio
 from auth_helper import requires_auth
 from ariadne.constants import PLAYGROUND_HTML
 from models import Classifier, Feature, Patient, User, db
-from initializeClassifier import initializeClassifier
+from initializeClassifier import initializeClassifier, classifier_task
 
 blueprint_graph = Blueprint('GraphQLServer', __name__)
 
@@ -74,7 +74,7 @@ def resolve_get_classifier(_, info):
     user_id = _request_ctx_stack.top.current_user.get('sub')
     classifier = Classifier.query.filter_by(user_id=user_id).first()
     if classifier is None:
-        print("failed to get the classifer")
+        print("Failed to get the classifer")
         return "failed"
     # Add payload the distinct features array so that the table can be constructed accordingly
     r = Feature.query.with_entities(Feature.featureName).filter_by(
@@ -93,11 +93,12 @@ def resolve_hello(_, info):
 
 @query.field("checkStatus")
 def resolve_chech_status(_, info):
+    ''' This is like the getClassifer but used with polling'''
     user_id = _request_ctx_stack.top.current_user.get('sub')
     classifier = Classifier.query.filter_by(user_id=user_id).first()
     if classifier is None:
         return "failed"
-    print(classifier.classifierStatus)
+    print(f"Classifier Status: {classifier.classifierStatus}")
     return classifier.classifierStatus
 
 @mutation.field("sum")
@@ -127,7 +128,10 @@ async def resolve_train(_, info):
     #db.session.add(classifier)
     #db.session.commit()
     loop = asyncio.get_running_loop()
+    
     result = await initializeClassifier(loop)
+    # loop.run_in_executor(None, classifier_task())
+    # classifier.classifierStatus = "training"
     return classifier.classifierStatus
 
 #port = int(os.environ.get('PORT', 8000))

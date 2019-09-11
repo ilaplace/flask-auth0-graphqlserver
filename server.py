@@ -103,12 +103,6 @@ def private_scoped():
     }, 403)
 
 
-
-# TODO: Use the domain environment variable
-# TODO: Make sure the file name is unique
-# TODO: Since this is an API don't flash but send response
-
-
 @route_cors(
     allow_origin=ORIGIN_URI,
     allow_methods=["*"],

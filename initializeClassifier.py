@@ -4,6 +4,27 @@ import pandas as pd
 import numpy as np
 import concurrent.futures
 
+async def classifier_task():
+    ''' Called from the startTraining mutation, caller of the train method'''
+    user_id = _request_ctx_stack.top.current_user.get('sub')
+    if not (User.query.get(user_id)):
+        print("No database found")
+
+    r = db.session.query(Patient, Feature).outerjoin(
+        Feature, Patient.id == Feature.patient_id).all()
+
+    a = np.arange(15).reshape(5, 3)
+    for element in a.flat:
+        a.flat[element] = np.int64(r[element].Feature.featureValue)
+
+
+    classifier = Classifier.query.filter_by(user_id=user_id).first()
+    trainedClassifier = train(classifier)
+    classifier.classifierStatus = trainedClassifier.classifierStatus
+    db.session.add(classifier)
+    db.session.commit()
+    return "success"
+
 async def initializeClassifier(loop):
     ''' Called from the startTraining mutation, caller of the train method'''
     user_id = _request_ctx_stack.top.current_user.get('sub')
@@ -16,7 +37,7 @@ async def initializeClassifier(loop):
     a = np.arange(15).reshape(5, 3)
     for element in a.flat:
         a.flat[element] = np.int64(r[element].Feature.featureValue)
-    print(a)
+
 
     with concurrent.futures.ProcessPoolExecutor() as pool:
         classifier = Classifier.query.filter_by(user_id=user_id).first()
@@ -28,9 +49,9 @@ async def initializeClassifier(loop):
 
 # simulating a CPU bound task
 def train(classifier):
-    sum(i * i for i in range(10 ** 6))
+    sum(i * i for i in range(10 ** 7))
 
-    classifier.classifierStatus = "done"
-    print("doneeee")
+    classifier.classifierStatus = "trained"
+    print("Done training")
     return classifier
 

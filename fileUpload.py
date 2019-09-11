@@ -13,10 +13,14 @@ blueprint_upload = Blueprint('fileUpload', __name__)
 @blueprint_upload.route('/api/upload', methods=['POST'])
 @requires_auth
 async def upload_file():
+    ''' Uploaded excel files reach here if properly formatted calls the importDatabase() function 
+    '''
     message = "unkown file"
     if 'file' not in await request.files:
         return jsonify(message="No file part"), 400
+
     file = (await request.files)['file']
+
     if file.filename == '':
          return jsonify(message="No file Selected"), 400
 
@@ -26,20 +30,16 @@ async def upload_file():
         file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
         user_id = _request_ctx_stack.top.current_user.get('sub')
 
-        # this is not necessary as the file ereased
-        # if os.path.exists(file_path):
-        #     await importDatabase(filename, user_id)
-        #     return jsonify(message="file already exists"), 200
-
         file.save(os.path.join(current_app.config['UPLOAD_FOLDER'], filename))
 
-        # TODO: Check if the user exists
         user_id = _request_ctx_stack.top.current_user.get('sub')
+        
         # Get the mail from the access token which is modified by the help of the help of the auth0 rules
         mail = _request_ctx_stack.top.current_user.get(
             'https://dev-yy8du86w.eu/mail')
 
         this_user = User(id=user_id, mail=mail)
+        
         # Do not create a user object if it already exists
         if not (User.query.get(user_id)):
             db.session.add(this_user)
@@ -57,6 +57,8 @@ async def upload_file():
 
 
 def importDatabase(filename, user):
+    '''Imports the uploaded excel file to the database than deletes the excel file
+    '''
     df = pd.read_excel(os.path.join(current_app.config['UPLOAD_FOLDER'], filename))
 
     for index, row in df.iterrows():
