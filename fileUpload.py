@@ -62,7 +62,7 @@ def importDatabase(filename, user):
     df = pd.read_excel(os.path.join(current_app.config['UPLOAD_FOLDER'], filename))
 
     for index, row in df.iterrows():
-        new_patient = Patient(user_id=user, status="undiag")
+        new_patient = Patient(user_id=user, status="undiag", diagnose=str(row[3]))
         featureA = Feature(
             featureName='A', featureValue=str(row[0]), classifier_id=1)
         featureB = Feature(

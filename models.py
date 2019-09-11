@@ -17,7 +17,7 @@ class Patient(db.Model):
     user_id = db.Column(db.String(20), db.ForeignKey('user.id'))
     status = db.Column(db.String, nullable=False)
     features = db.relationship('Feature', backref='patient', lazy=False)
-
+    diagnose = db.Column(db.String, nullable=True)
     def __repr__(self):
         return self.id
 
