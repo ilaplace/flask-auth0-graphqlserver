@@ -9,7 +9,7 @@ from ariadne.constants import PLAYGROUND_HTML
 from flask_sqlalchemy import SQLAlchemy
 import os
 
-import enum
+
 
 import time
 from graphServer import blueprint_graph
@@ -44,22 +44,15 @@ print(f'Production: {is_prod}')
 APP.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 #db = SQLAlchemy(APP)
 
+# Initialization of the database
 db.init_app(APP)
 db.app = APP
 db.create_all()
 
-APP = cors(APP,
-           allow_origin=ORIGIN_URI,
-           allow_methods='*',
-           allow_headers='*',
-           allow_credentials=True
-           )
-
-class PatientStatus(enum.Enum):
-    DIAGNOSED = 1
-    FAILED = 2
-    UNDIAGNOSE = 3
-
+APP = cors(APP, allow_origin=ORIGIN_URI,
+                allow_methods='*',
+                allow_headers='*',
+                allow_credentials=True)
 
 
 # Format error response and append status code.
@@ -112,6 +105,6 @@ def private_scoped():
 async def diagnose():
     data = await request.data
     print(data)
-    return "success", 200
+    return jsonify(message="well hello")
 
 

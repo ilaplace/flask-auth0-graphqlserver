@@ -1,6 +1,13 @@
 from flask_sqlalchemy import SQLAlchemy
+import enum
 
 db = SQLAlchemy()
+
+class PatientStatus(enum.Enum):
+    DIAGNOSED = 1
+    FAILED = 2
+    UNDIAGNOSE = 3
+
 
 class User(db.Model):
     id = db.Column(db.String(20), primary_key=True)
