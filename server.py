@@ -17,6 +17,7 @@ from fileUpload import blueprint_upload
 from auth_helper import get_token_auth_header, requires_auth, AuthError
 from models import Classifier, Feature, Patient, User, db
 
+import random
 
 ENV_FILE = find_dotenv()
 if ENV_FILE:
@@ -104,7 +105,16 @@ def private_scoped():
 @requires_auth
 async def diagnose():
     data = await request.data
-    print(data)
-    return jsonify(message="well hello")
+    #print(data)
+    datastr = str(data)
+
+    # Read the number of patients
+    index = datastr.find('numberOfPatients')
+    numberOfPatients = int(datastr[index+len('numberOfPatients')+3])
+    resp = []
+    for x in range(numberOfPatients):
+        resp.append(random.randint(1,10))
+
+    return jsonify(message=resp)
 
 
