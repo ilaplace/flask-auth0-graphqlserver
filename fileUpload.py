@@ -87,11 +87,12 @@ def importDatabase(filename, user):
     rows = df.shape[1]
     
     for index, row in df.iterrows():
-        new_patient = Patient(user_id=user, status="undiag", diagnose=str(row.size-1))
-        for idx, r in enumerate(row) :
-            feature = Feature(
-            featureName=df.columns[idx], featureValue=str(r), classifier_id=classifier.id)
-            new_patient.features.append(feature)
+        new_patient = Patient(user_id=user, status="undiag", diagnose=str(row[row.size-1]))
+        for idx, r in enumerate(row):
+            if(idx!=row.size-1):
+                feature = Feature(
+                featureName=df.columns[idx], featureValue=str(r), classifier_id=classifier.id)
+                new_patient.features.append(feature)
 
         db.session.add(new_patient)
         db.session.commit()
