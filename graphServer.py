@@ -78,7 +78,7 @@ def resolve_get_classifier(_, info):
         return "failed"
     # Add payload the distinct features array so that the table can be constructed accordingly
     r = Feature.query.with_entities(Feature.featureName).filter_by(
-        classifier_id=classifier.id).distinct()
+        classifier_id=classifier.id).distinct().order_by(Feature.featureName)
     classifier.featureTypes = r
     print(classifier.classifierStatus)
     return classifier

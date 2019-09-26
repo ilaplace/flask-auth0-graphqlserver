@@ -77,6 +77,34 @@ def importDatabase(filename, user):
 
     os.remove(os.path.join(current_app.config['UPLOAD_FOLDER'], filename))
 
+def importDatabase(filename, user):
+    '''Imports the uploaded excel file to the database than deletes the excel file
+    '''
+    df = pd.read_excel(os.path.join(current_app.config['UPLOAD_FOLDER'], filename))
+    user_id = _request_ctx_stack.top.current_user.get('sub')
+    classifier = Classifier.query.filter_by(user_id=user_id).first()
+    
+    rows = df.shape[1]
+    
+    for index, row in df.iterrows():
+        new_patient = Patient(user_id=user, status="undiag", diagnose=str(row.size-1))
+        for idx, r in enumerate(row) :
+            feature = Feature(
+            featureName=df.columns[idx], featureValue=str(r), classifier_id=classifier.id)
+            new_patient.features.append(feature)
+
+        db.session.add(new_patient)
+        db.session.commit()
+
+    
+    r = Feature.query.with_entities(Feature.featureName).filter_by(
+        classifier_id=classifier.id).distinct()
+    classifier.numberOfFeatureTypes = r.count()
+    db.session.add(classifier)
+    db.session.commit()
+
+    os.remove(os.path.join(current_app.config['UPLOAD_FOLDER'], filename))
+
 def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS

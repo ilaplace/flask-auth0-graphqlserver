@@ -105,12 +105,14 @@ def private_scoped():
 @requires_auth
 async def diagnose():
     data = await request.data
-    #print(data)
+    print(data)
     datastr = str(data)
 
     # Read the number of patients
     index = datastr.find('numberOfPatients')
-    numberOfPatients = int(datastr[index+len('numberOfPatients')+3])
+    if(index == -1):
+        return jsonify(message="numberOfPatients could not be read")
+    numberOfPatients = int(datastr[index+len('numberOfPatients')+2])
     resp = []
     for x in range(numberOfPatients):
         resp.append(random.randint(1,10))

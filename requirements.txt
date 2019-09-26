@@ -9,3 +9,4 @@ numpy
 pandas
 xlrd
 hypercorn
+scikit-learn
